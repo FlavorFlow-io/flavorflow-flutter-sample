@@ -1,0 +1,91 @@
+# White-Label Contract Build
+#
+# FlavorFlow must never break this Flutter consumer. This workflow treats every
+# directory under test/fixtures/ as a "client branding artifact the backend
+# could ship", and validates each one independently in a matrix:
+#
+#   1. discover  — emit the list of fixtures as a build matrix.
+#   2. validate  — per fixture: inject it into assets/branding/ (exactly what
+#                  FlavorFlow does at build time), then run the contract +
+#                  golden tests scoped to that one brand.
+#
+# A schema break (contract test) or a visual regression (golden test) fails the
+# job; golden diffs are uploaded as artifacts so the change is reviewable.
+#
+# Goldens are bootstrapped: the first time a fixture has no committed golden the
+# job records one (via --update-goldens) and uploads it. Commit those images to
+# lock the visual contract; subsequent runs verify against them.
+name: White-Label Contract Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      update_goldens:
+        description: 'Record/refresh goldens instead of verifying'
+        type: boolean
+        default: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      fixtures: ${{ steps.list.outputs.fixtures }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: list
+        name: Discover branding fixtures
+        run: |
+          fixtures=$(ls -1 test/fixtures | jq -R . | jq -cs .)
+          echo "fixtures=$fixtures" >> "$GITHUB_OUTPUT"
+          echo "Fixtures: $fixtures"
+
+  validate:
+    name: "Validate '${{ matrix.fixture }}'"
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: ${{ fromJson(needs.discover.outputs.fixtures) }}
+    env:
+      FF_ONLY_FIXTURE: ${{ matrix.fixture }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      # Inject this client's branding exactly as FlavorFlow would at build time.
+      - name: Apply branding fixture
+        run: ./scripts/apply-fixture.sh "${{ matrix.fixture }}"
+
+      - name: Run contract + golden tests
+        run: |
+          GOLDEN="test/goldens/images/${{ matrix.fixture }}.png"
+          if [ "${{ github.event.inputs.update_goldens }}" = "true" ] || [ ! -f "$GOLDEN" ]; then
+            echo "::notice::Recording golden for '${{ matrix.fixture }}' (no committed image or update requested)."
+            flutter test --update-goldens
+          else
+            flutter test
+          fi
+
+      - name: Upload golden diffs / recorded images
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: goldens-${{ matrix.fixture }}
+          path: |
+            test/goldens/images/
+            test/goldens/failures/
+          if-no-files-found: ignore

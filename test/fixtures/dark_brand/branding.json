@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "appName": "Dark Brand",
+  "packageId": "io.flavorflow.sample.darkbrand",
+  "logo": "logo.png",
+  "tagline": "A dark-mode-first client",
+  "colors": {
+    "brightness": "dark",
+    "seed": "#00E5C0",
+    "secondary": "#4DD0B1"
+  }
+}

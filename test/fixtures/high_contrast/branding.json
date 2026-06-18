@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "appName": "High Contrast",
+  "packageId": "io.flavorflow.sample.highcontrast",
+  "logo": "logo.png",
+  "tagline": "Maximum legibility, fixed roles",
+  "colors": {
+    "brightness": "light",
+    "seed": "#000000",
+    "primary": "#000000",
+    "secondary": "#1A1A1A",
+    "tertiary": "#3D3D3D",
+    "error": "#D50000"
+  }
+}
